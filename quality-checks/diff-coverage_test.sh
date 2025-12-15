@@ -86,9 +86,50 @@ format_coverage_output() {
     echo -e "$output"
 }
 
+# get_base_branch() {
+#     echo -e "${BLUE}Fetching main branch for comparison...${NC}" >&2
+#     if git fetch --deepen=50 https://github.com/aws/amazon-mwaa-docker-images.git main >/dev/null 2>&1; then
+#         echo "FETCH_HEAD"  # This points to the fetched main branch
+#     else
+#         echo -e "${RED}Error: Could not fetch main branch. Please check your internet connection.${NC}" >&2
+#         exit 1
+#     fi
+# }
+
 get_base_branch() {
     echo -e "${BLUE}Fetching main branch for comparison...${NC}" >&2
-    if git fetch --deepen=50 https://github.com/aws/amazon-mwaa-docker-images.git main >/dev/null 2>&1; then
+    
+    # Debug: Show current branch history BEFORE deepen
+    echo -e "${YELLOW}=== DEBUG: Current branch history BEFORE deepen ===${NC}" >&2
+    git log --oneline -n 10 2>&1 || echo "No history available" >&2
+    echo -e "${YELLOW}Total commits in current branch: $(git rev-list --count HEAD 2>/dev/null || echo '0')${NC}" >&2
+    
+    # # Ensure we have enough history in the current branch
+    # echo -e "${YELLOW}Deepening current branch...${NC}" >&2
+    # git fetch --deepen=50 origin HEAD >/dev/null 2>&1 || true
+    
+    # Debug: Show current branch history AFTER deepen
+    echo -e "${YELLOW}=== DEBUG: Current branch history AFTER deepen ===${NC}" >&2
+    git log --oneline -n 10 2>&1 || echo "No history available" >&2
+    echo -e "${YELLOW}Total commits in current branch: $(git rev-list --count HEAD 2>/dev/null || echo '0')${NC}" >&2
+    
+    # Fetch main branch
+    echo -e "${YELLOW}Fetching main branch...${NC}" >&2
+    if git fetch --depth=50 https://github.com/aws/amazon-mwaa-docker-images.git main >/dev/null 2>&1; then
+        # Debug: Show fetched main branch history
+        echo -e "${YELLOW}=== DEBUG: Fetched main branch history ===${NC}" >&2
+        git log --oneline FETCH_HEAD -n 10 2>&1 || echo "No FETCH_HEAD available" >&2
+        echo -e "${YELLOW}Total commits in FETCH_HEAD: $(git rev-list --count FETCH_HEAD 2>/dev/null || echo '0')${NC}" >&2
+        
+        # Debug: Try to find merge base
+        echo -e "${YELLOW}=== DEBUG: Attempting to find merge base ===${NC}" >&2
+        if merge_base=$(git merge-base HEAD FETCH_HEAD 2>&1); then
+            echo -e "${GREEN}Merge base found: ${merge_base}${NC}" >&2
+            git log --oneline -n 1 "$merge_base" >&2
+        else
+            echo -e "${RED}Merge base NOT found! Error: ${merge_base}${NC}" >&2
+        fi
+        
         echo "FETCH_HEAD"  # This points to the fetched main branch
     else
         echo -e "${RED}Error: Could not fetch main branch. Please check your internet connection.${NC}" >&2
